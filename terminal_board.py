@@ -16,6 +16,10 @@ class Board:
         # saving (row,col) tuples in the set
         self.dug = set()
         self.flagged = set()
+        self.unknown = set()
+        for row in range(dim_size):
+            for col in range(dim_size):
+                self.unknown.add((row, col))
 
 
     def get_dim_size(self):
@@ -71,7 +75,11 @@ class Board:
 
     def place_flag(self, row, col):
         # this function is going to place a flag where you think there is a bomb
-        self.flagged.add((row, col))         
+        self.flagged.add((row, col))  
+
+    def remove_flag(self, row, col):
+        # this function removes a flag if you think you had a false alarm
+        self.flagged.remove((row,col))       
 
     def dig(self, row, col):
         # return True if good dig
@@ -81,7 +89,8 @@ class Board:
         # hit a bomb --> game over
         # dig at a location with neighboring bombs --> finish dig
         # dig at location with no neighboring bombs --> recursively dig neighbors
-        self.dug.add((row, col))  # keep track of where we dug
+        self.dug.add((row, col)) # keep track of where we dug
+        self.unknown.remove((row, col)) # remove dug hole from available pool (this is needed for if ai uses flags)
 
         if self.board[row][col] == '*':
             return False
@@ -94,7 +103,6 @@ class Board:
                 if (r, c) in self.dug:
                     continue # don't dig where you've already dug
                 self.dig(r,c)
-                self.dug.add((r,c)) # superflous?
 
         # if our initial dig didn't hit a bomb, we shouldn't hit a bomb here
         return True
@@ -151,19 +159,30 @@ class Board:
 
         return string_rep
 
-def play(dim_size=10, num_bombs = 10):
+def play(dim_size = 5, num_bombs = 5):
     board = Board(dim_size, num_bombs)
 
     safe = True
-    while len(board.dug) < board.dim_size**2 -num_bombs:
+    while len(board.dug) < ((board.dim_size ** 2) - num_bombs):
         print(board)
-        user_decision = input("Would you like to add a flag or dig?")
+
+        # Faulty flag warning
+        if (len(board.dug) + len(board.flagged) == board.dim_size ** 2):
+            print("WARNING! You have more flags than there are mines, something's not safe!")
+
+        user_decision = input("Would you like to add a flag or dig? Input 'dig' to dig, 'flag' to add/remove flags: ")
         if user_decision == "dig":
             user_input = re.split(',(\\s)*' , input("Where would you like to dig? Input as row,col: "))  # ex: 2,8
             row, col = int(user_input[0]), int(user_input[-1])
             if row <0 or row>= board.dim_size or col<0 or col>= dim_size:
                 print("Invalid location. Try again!")
                 continue
+            elif (row, col) in board.dug:
+                print("You've already dug here. Try again!")
+                continue # don't dig where you've already dug
+            elif (row, col) in board.flagged:
+                print("Woah, there's a flag here! Remove the flag before digging here, try again!")
+                continue # don't dig where you suspect a mine, that's bad for your health
 
             # if it is valid
             safe = board.dig(row, col)
@@ -171,13 +190,20 @@ def play(dim_size=10, num_bombs = 10):
                 # dug a bomb
                 break # (game over)
         elif user_decision == "flag":
-            user_input = re.split(',(\\s)*' , input("Where would you like to dig? Input as row,col: "))  # ex: 2,8
+            user_input = re.split(',(\\s)*' , input("Where would you like to place/remove a flag? Input as row,col: "))  # ex: 2,8
             row, col = int(user_input[0]), int(user_input[-1])
             if row <0 or row>= board.dim_size or col<0 or col>= dim_size:
                 print("Invalid location. Try again!")
                 continue
+            elif (row, col) in board.dug:
+                print("You already dug here safely. Try again!")
+                continue # no reason to flag a safe spot
+
             # if it is valid
-            safe = board.place_flag(row, col)
+            if (row, col) in board.flagged:
+                board.remove_flag(row, col) # remove flag
+            else:
+                board.place_flag(row, col) # add flag
         else:
             print("Invalid command. Try again!")
             continue
@@ -195,48 +221,61 @@ def play(dim_size=10, num_bombs = 10):
 
 
 safe = True
-def generate_loc(dim_size=3, num_bombs=3):
+def generate_loc(dim_size = 5, num_bombs = 5):
     board = Board(dim_size, num_bombs)
+    print("I am the random minesweeping AI. I sweep mines with randomness.")
 
     safe = True
     while len(board.dug) < board.dim_size**2 -num_bombs:
-        print(board)
         loc = random.randint(0, dim_size**2 -1)
         # we want the number of times dim_size goes into loc to tell us what row to look at
         row = loc // board.dim_size
         # the remainder of loc % dim_size to give us the col
         col = loc % board.dim_size
+
+        # prevent digging in already dug places
+        if (row, col) not in board.unknown:
+            # print("test -> already dug")
+            continue
+
+        print(board)
+
         print(row,col)
         if row <0 or row>= board.dim_size or col<0 or col>= dim_size:
-            print("Invalid location. Try again!")
+            print("I went the wrong way. Trying again.")
             continue       
         elif (row, col) in board.dug:
+            print("I already checked here. Trying again.")
             continue
         else:
+            print("I am digging a hole.")
             safe = board.dig(row, col) 
         if not safe:
             # the random generator dug a bomb
             break
     if safe:
-        print("The AI cleared the minefield :]")
+        print("I cleared the minefield :]")
         # let's reveal the whole board
         board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
         print(board)
     else:
-        print("The AI blew up :[")
+        print("I blew up :[")
         # let's reveal the whole board
         board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
         print(board)
 
 
 safe = True
-def intelligent_solver(dim_size= 10, num_bombs=10):
- pass
+def intelligent_solver(dim_size = 5, num_bombs = 5):
+    pass
 # check the surroundings of a bomb to check for a 1. If the 1 has no mines around it
 # the tile we are on is a mine. if we know a for sure mine is somewhere we can decrement the values around it
 # if a 0 tile is touching an uncovered tile that means it doesn't have a bomb
-#implements basically reasoning
-#create a list of safe coordinates. if its empty then i need to randomly check
-#create basically another board and hold boolean values like has it been dug, is it flagged, and is it safe
+# implements basically reasoning
+# create a list of safe coordinates. if its empty then i need to randomly check
+# create basically another board and hold boolean values like has it been dug, is it flagged, and is it safe
 if __name__ == '__main__':
- generate_loc()
+    # choose function as needed for testing
+    generate_loc()
+    # play()
+    # intelligent_solver()
