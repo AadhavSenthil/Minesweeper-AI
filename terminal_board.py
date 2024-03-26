@@ -184,6 +184,9 @@ def play(dim_size=10, num_bombs = 10):
 
     if safe:
         print("CONGRATULATIONS!!!!! YOU WON!")
+        # let's reveal the whole board
+        board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
+        print(board)
     else:
         print("sorry game over :(")
         # let's reveal the whole board
@@ -216,6 +219,9 @@ def generate_loc(dim_size=3, num_bombs=3):
             break
     if safe:
         print("The AI cleared the minefield :]")
+        # let's reveal the whole board
+        board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
+        print(board)
     else:
         print("The AI blew up :[")
         # let's reveal the whole board
