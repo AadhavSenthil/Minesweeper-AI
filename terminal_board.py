@@ -235,7 +235,6 @@ def generate_loc(dim_size = 5, num_bombs = 5):
 
         # prevent digging in already dug places
         if (row, col) not in board.unknown:
-            # print("test -> already dug")
             continue
 
         print(board)
