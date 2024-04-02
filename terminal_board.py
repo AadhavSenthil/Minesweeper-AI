@@ -1,10 +1,13 @@
 
 import random
 import re
+import copy
 
 
 class Board:
     def __init__(self, dim_size, num_bombs):
+        self.mines = set()        
+        self.unrevealed = set ()
         self.dim_size = dim_size
         self.num_bombs = num_bombs
 
@@ -16,18 +19,19 @@ class Board:
         # saving (row,col) tuples in the set
         self.dug = set()
         self.flagged = set()
-
-
-    def get_dim_size(self):
-        return self.dim_size
-    def get_num_bombs(self):
-        return self.num_bombs
+        self.safe = set()
+        self.known = set ()
 
 
     def make_new_board(self):
            # making a board that is based on the dim size and num bombs
            # I plan on using a list of lists
         board = [[None for _ in range(self.dim_size)]for _ in range(self.dim_size)]
+
+        # for unrevealed spaces
+        for r in range(self.dim_size):
+            for c in range(self.dim_size):
+                self.unrevealed.add((r,c))
 
         #plant bombs
         bombs_planted = 0
@@ -42,6 +46,7 @@ class Board:
                 # this means we've actually planted a bomb there already so keep going
                 continue
             board[row][col] = '*' #plant the bomb
+            self.mines.add((row,col))
             bombs_planted +=1
         return board
     
@@ -93,8 +98,9 @@ class Board:
             for c in range(max(0, col-1), min(self.dim_size-1, col+1)+1):
                 if (r, c) in self.dug:
                     continue # don't dig where you've already dug
-                self.dig(r,c)
                 self.dug.add((r,c))
+                self.dig(r,c)
+
 
         # if our initial dig didn't hit a bomb, we shouldn't hit a bomb here
         return True
@@ -225,12 +231,150 @@ def generate_loc(dim_size=10, num_bombs=10):
 
 safe = True
 def intelligent_solver(dim_size= 10, num_bombs=10):
- pass
 # check the surroundings of a bomb to check for a 1. If the 1 has no mines around it
 # the tile we are on is a mine. if we know a for sure mine is somewhere we can decrement the values around it
 # if a 0 tile is touching an uncovered tile that means it doesn't have a bomb
 #implements basically reasoning
 #create a list of safe coordinates. if its empty then i need to randomly check
 #create basically another board and hold boolean values like has it been dug, is it flagged, and is it safe
+
+    board = Board(dim_size, num_bombs)
+    neighbors = []
+    safe = True
+    currsquare = 0
+
+    loc = random.randint(0, dim_size**2 -1)
+    # we want the number of times dim_size goes into loc to tell us what row to look at
+    row = loc // board.dim_size
+    # the remainder of loc % dim_size to give us the col
+    col = loc % board.dim_size
+
+    safe = board.dig(row, col)
+
+    if safe == False:
+        pass
+
+    if safe == True:
+        while len(board.unrevealed) > 0:
+            print("Game Board")
+            print(board)
+            board.unrevealed = board.unrevealed - board.dug - board.flagged
+
+
+            if len(board.flagged) == num_bombs:
+                break
+
+            # input()
+            # we are gonna move through each square in unrevealed
+            # if the curr square doesn't have more than 2 revealed tiles around it then
+            # increase curr square by 1
+            flag = True
+            while flag == True:
+                ai_board = copy.deepcopy(board)
+                flag = False
+                important_neighbors = set()
+                for (row, col) in board.dug:
+                    if board.board[row][col] != 0:
+                        neighbors = get_neighbors(board,row, col)
+                        important_neighbors = copy.deepcopy(neighbors)
+                        for (r,c) in neighbors:
+                            if (r,c) in board.flagged:
+                                ai_board.board[row][col] -=1
+                                important_neighbors.remove((r,c))
+                            elif (r,c) in board.dug:
+                                important_neighbors.remove((r,c))
+                        if len(important_neighbors) == ai_board.board[row][col]\
+                            and len(important_neighbors) != 0:
+                            for (x,y) in important_neighbors:
+                                board.place_flag(x,y)
+                                ai_board.place_flag(x,y)
+                                board.unrevealed = board.unrevealed - board.flagged
+                                ai_board.board[row][col] = 0
+                            flag = True
+                    
+            
+            #print("AI Board")
+            #print(ai_board)
+
+            board.unrevealed = board.unrevealed  - board.dug - board.flagged
+
+            dug = False
+            for (row, col) in board.unrevealed:
+                neighbors = get_neighbors(board, row, col)
+                for (r,c) in neighbors:
+                    if ai_board.board[r][c] == 0:
+                        # print(row,col)
+                        safe = board.dig(row,col)
+                        dug = True
+                        break
+                if dug == True:
+                    break
+
+            board.unrevealed = board.unrevealed  - board.dug - board.flagged
+
+            if dug == False:
+                row, col = board.unrevealed.pop()
+                print(row, col)
+                safe = board.dig(row, col)
+            if not safe:
+                break
+
+
+
+
+
+
+        # for (row, col) in board.unrevealed:
+        #     neighbors = get_neighbors(board, row, col)
+        #     if len(neighbors) < 2:
+        #         # i need this to move down my set
+        #         # of unrevealed tiles
+        #         continue
+        #     else:
+        #         # checking all around the tile we are on to see if there is uncovered
+        #         # tile that has any clues on whether the current tile is safe
+        #         # checks the neighbors of each tile and if any of the tiles
+        #         # have all the neighbors uncovered
+        #         for (r,c) in neighbors:
+        #             neighbors1 = get_neighbors(board,r,c)
+        #             neighbors1.remove((row,col))
+        #             if neighbors1 in board.dug:
+        #                 if board.board[r][c] > 0:
+        #                     board.place_flag(row,col)
+        #                     board.unrevealed = board.unrevealed - board.flagged
+
+        # make the ai_board run through all dug squares check all surroundings if its 
+        # greater than 0, if any of the surrounding blocks are flagged subtract 1 from value
+        # if the square becomes a 0 then uncover all unrevealed squares around it
+        
+
+    if safe:
+        print("CONGRATULATIONS!!!!! YOU WON!")
+        board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
+        print("Answer")
+        print(board)
+        print("AI Board")
+        print (ai_board)
+    else:
+        print("sorry game over :(")
+        # let's reveal the whole board
+        board.dug = [(r,c) for r in range(board.dim_size) for c in range(board.dim_size)]
+        print(board)
+
+
+              
+
+def get_neighbors(board,row, col, dim_size = 10):
+    neighbors = set ()
+    possible_neighbors = {(row-1,col-1),(row-1,col),(row-1,col+1),(row,col+1),(row+1,col+1),(row+1,col),(row+1,col-1),(row,col-1)}
+    neighbors = copy.deepcopy(possible_neighbors)
+    for (r,c) in possible_neighbors:
+        if r <0 or r>= dim_size or c<0 or c>= dim_size:
+            neighbors.remove((r,c))
+    return neighbors
+
+
+
 if __name__ == '__main__':
- generate_loc()
+ #generate_loc()
+ intelligent_solver()
